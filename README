@@ -1,0 +1,33 @@
+INSTALL
+
+make
+install submiter_test.ko
+-------------------------------------------------------------------------------------
+USER MANUAL
+After insmoding  the submiter_test.ko, it will create a proc file at /proc/submiter/submiter_entry. 
+Echo args to the file could submit bio to our device. 
+
+The echo args will like: 
+lba bvector_number and followed by each vectors offset and length, separated by space. 
+
+Example:
+If I want to send a bio the device (default is /dev/memdiska) at lba 128, the bio has 3 bvecs. 
+	the first bvec: offset 0, len 512
+	the second bvec: offset 512, len 1024 
+	the first bvec: offset 1024, len 3072 
+I could use this command:
+	echo 128 3 0 512 512 1024 1024 3072 > /proc/submiter/submiter_entry
+
+Two bios will be submited to the device, first write data to device, then read out and compare. 
+If errors happen or data dismatch, the echo command will return error, 
+   and detail information could be found in "dmesg".
+
+A quick script is also create. You could just edit the data.txt file, write each bio's information, 
+then run submit.sh, the script will read the data.txt and echo each line to /proc/submiter/submiter_entry.
+
+-------------------------------------------------------------------------------------
+Bug Report:
+chang.liu@memblaze.com
+
+
+
