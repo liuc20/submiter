@@ -78,6 +78,5 @@ int read_data_from_dev(struct block_device *dev, char* data_buffer,
 int write_data_to_dev(struct block_device *dev, char *data_buffer, 
 			      int len, struct test_bvec *array, sector_t lba);
 
-struct test_bvec *submiter_generate_bvecs(char *cmd, int *len, 
-										 unsigned long *lba);
+struct test_bvec *submiter_generate_bvecs(char *cmd, int *len, unsigned long *lba);
 #endif

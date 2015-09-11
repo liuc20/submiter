@@ -5,9 +5,6 @@ char *data_buffer;
 
 struct submiter g_submiter;
 
-int test_lba = 0;
-module_param_named(lba, test_lba, int, S_IRUGO | S_IWUSR);
-
 static struct bio *test_create_bio(struct block_device *dev, int len, 
 				   struct test_bvec *array)
 {
@@ -171,6 +168,33 @@ static struct test_context *alloc_test_context(struct block_device *dev,
 	return context;
 }
 
+#ifdef SUBMITER_DEBUG
+static inline void dump_bio(struct bio *bio)
+{
+	int i = 0;
+	struct bio_vec *bvec = NULL;
+	char *page_addr = NULL;
+
+
+	printk("bio 0x%p, lba %lu, size %d, rw 0x%lx\n", 
+		   bio, pb_bio_start(bio), 
+		   pb_bio_size(bio), bio->bi_rw);
+
+	for (i = 0; i < bio->bi_vcnt; i++) {
+		bvec = pb_bio_iovec_idx(bio, i);
+		printk("bvec 0x%p, page 0x%p, offset %d, length %d\n",
+			   bvec, bvec->bv_page, bvec->bv_offset, bvec->bv_len);
+		page_addr = page_address(bvec->bv_page);
+		printk("start char %c, last char %c\n", 
+			   *(page_addr + bvec->bv_offset), 
+			   *(page_addr + bvec->bv_offset + bvec->bv_len - 1));
+	}
+}
+#else
+#define dump_bio(x)
+#endif
+
+
 int write_data_to_dev(struct block_device *dev, char *data_buffer, 
 			      int len, struct test_bvec *array, sector_t lba)
 {
@@ -197,6 +221,7 @@ int write_data_to_dev(struct block_device *dev, char *data_buffer,
 	bio->bi_private = context;
 
 	test_fill_in_data(bio, data_buffer);
+	dump_bio(bio);
 	generic_make_request(bio);
 
 	wait_event(context->endio_queue, (context->bio_status == BIO_ENDIO));
@@ -233,6 +258,7 @@ int read_data_from_dev(struct block_device *dev, char* data_buffer,
 	bio->bi_end_io = test_read_bio_endio;
 	bio->bi_private = context;
 
+	dump_bio(bio);
 	generic_make_request(bio);
 	wait_event(context->endio_queue, (context->bio_status == BIO_ENDIO));
 	error = context->error;
@@ -287,7 +313,7 @@ struct block_device *get_pblaze_disk(int flag)
 
 #endif
 
-static int submiter_get_next_number(char *buffer, unsigned long *ret)
+static int submiter_get_next_number(char *buffer, int *ret)
 {
 	char *start = buffer;
 	char *end = start;
@@ -304,15 +330,18 @@ static int submiter_get_next_number(char *buffer, unsigned long *ret)
 	return (end - start);
 }
 
-struct test_bvec *submiter_generate_bvecs(char *cmd, int *len, 
-												 unsigned long *lba)
+struct test_bvec *submiter_generate_bvecs(char *cmd, int *len, unsigned long *lba)
 {
 	struct test_bvec *bvec_array = NULL;
 	int ret = 0;
 	int i;
+	int value = 0;
 
-	ret = submiter_get_next_number(cmd, lba);
-	ret += submiter_get_next_number(cmd + ret, (unsigned long *)len);
+	ret = submiter_get_next_number(cmd, &value);
+	*lba = (unsigned long)value;
+
+	ret += submiter_get_next_number(cmd + ret, &value);
+	*len = value;
 	
 	bvec_array = kmalloc((*len) * sizeof(struct test_bvec), GFP_KERNEL);
 	if (!bvec_array) {
@@ -320,12 +349,11 @@ struct test_bvec *submiter_generate_bvecs(char *cmd, int *len,
 	}
 
 	for (i = 0; i < *len; i++) {
-		ret += submiter_get_next_number(cmd + ret, 
-										(unsigned long *)&bvec_array[i].offset);
-		ret += submiter_get_next_number(cmd + ret, 
-										(unsigned long *)&bvec_array[i].length);
-		printk("offset = %d, length = %d\n", 
-			   bvec_array[i].offset, bvec_array[i].length);
+		ret += submiter_get_next_number(cmd + ret, &value);
+		bvec_array[i].offset = value;
+
+		ret += submiter_get_next_number(cmd + ret, &value);
+		bvec_array[i].length = value;
 	}
 
 	return bvec_array;

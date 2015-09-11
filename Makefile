@@ -1,5 +1,6 @@
 SUBMITER = submiter_test
 
+#ccflays-y += SUBMITER_DEBUG
 obj-m += $(SUBMITER).o 
 
 $(SUBMITER)-objs := submiter_interface.o submiter.o
